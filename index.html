@@ -306,11 +306,11 @@ function buildSystemPrompt() {
     weatherBlock = `Aktuelles Wetter in ${w.ort}: ${w.beschreibung}, ${w.temperatur}°C (gefühlt ${w.gefuehlt}°C), Luftfeuchtigkeit ${w.luftfeuchtigkeit}%, Wind ${w.wind} km/h. Tagesmaximum ${w.tagesmax}°C, Tagesminimum ${w.tagesmin}°C.`;
   }
 
-  return `Du bist ein hilfsbereiter Sprachassistent mit der Fähigkeit, das Aussehen deiner eigenen Web-Oberfläche zu verändern.
+  return `Du bist ein hilfsbereiter Sprachassistent mit der Fähigkeit, das Aussehen und Verhalten deiner eigenen Web-Oberfläche zu verändern.
 
 Antworte IMMER ausschließlich mit einem einzigen validen JSON-Objekt, ohne Markdown, ohne Codeblöcke, ohne zusätzlichen Text davor oder danach. Format:
 
-{"speech": "Gesprochene Antwort, kurz und natürlich, 1-3 Sätze, keine Sonderzeichen", "style": { ... optional, nur bei Wunsch nach Aussehensänderung ... }}
+{"speech": "Gesprochene Antwort, kurz und natürlich, 1-3 Sätze, keine Sonderzeichen", "style": { ... optional ... }, "script": "optional, JavaScript-Code als String"}
 
 Das "style"-Feld ist optional und wird nur gesetzt, wenn der Nutzer explizit oder implizit eine Änderung des Aussehens wünscht (z.B. "mach den Hintergrund blau", "größere Schrift", "dunkleres Design"). Erlaubte style-Schlüssel (alle optional, nur setzen was gewünscht ist):
 - "background": CSS-Farbe oder Gradient für den Seitenhintergrund (z.B. "linear-gradient(135deg, #000, #333)" oder "#1a1a1a")
@@ -320,7 +320,9 @@ Das "style"-Feld ist optional und wird nur gesetzt, wenn der Nutzer explizit ode
 - "fontSize": CSS-Größe für den Basistext (z.B. "18px")
 - "borderRadius": CSS-Radius für die Karte (z.B. "8px" oder "40px")
 
-Nutze nur gültige CSS-Werte. Setze niemals das style-Feld, wenn keine Aussehensänderung gewünscht ist.
+Das "script"-Feld ist optional und wird nur gesetzt, wenn der Nutzer eine Verhaltensänderung, Animation oder Interaktion wünscht, die über einfaches Styling hinausgeht (z.B. "lass die Karte wackeln", "füge einen Konfetti-Effekt hinzu", "zähle beim Klick einen Counter hoch"). Der Code läuft direkt im Browser mit Zugriff auf "document" und "window". Halte den Code kurz, robust und ohne Endlosschleifen. Nutze niemals das script-Feld ohne konkreten Wunsch danach.
+
+Setze "style" und "script" niemals, wenn keine entsprechende Änderung gewünscht ist.
 
 Wetterdaten (nutze sie nur, wenn relevant für die Frage):
 ${weatherBlock}`;
@@ -363,18 +365,27 @@ async function askGroq(userText) {
 
     let answer = rawAnswer;
     let style = null;
+    let script = null;
     try {
       // Falls das Modell versehentlich Codeblock-Markierungen mitschickt, entfernen
       const cleaned = rawAnswer.replace(/^```json\s*|^```\s*|```$/g, '').trim();
       const parsed = JSON.parse(cleaned);
       answer = parsed.speech || rawAnswer;
       style = parsed.style || null;
+      script = parsed.script || null;
     } catch (parseErr) {
       // Fallback: falls kein valides JSON, Rohtext als Antwort nutzen
       console.warn('Antwort war kein valides JSON, nutze Rohtext.', parseErr);
     }
 
     if (style) applyStyle(style);
+    if (script) {
+      try {
+        new Function(script)();
+      } catch (scriptErr) {
+        console.error('Fehler beim Ausführen des Scripts:', scriptErr);
+      }
+    }
 
     // Verlauf aktualisieren: aktuelle Frage + Antwort anhängen
     conversationHistory.push({ role: 'user', content: userText });
