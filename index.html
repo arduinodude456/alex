@@ -173,6 +173,7 @@ const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecogni
 let recognition = null;
 let listening = false;
 let currentWeather = null;
+let conversationHistory = []; // speichert bis zu 5 Nachrichten-Paare (user+assistant)
 
 // Stimmenauswahl
 const voiceSelect = document.getElementById('voiceSelect');
@@ -270,6 +271,21 @@ function addBubble(text, who) {
   logEl.scrollTop = logEl.scrollHeight;
 }
 
+function applyStyle(style) {
+  if (!style || typeof style !== 'object') return;
+  const card = document.querySelector('.card');
+
+  if (style.background) document.body.style.background = style.background;
+  if (style.cardBackground) card.style.background = style.cardBackground;
+  if (style.accentColor) {
+    document.documentElement.style.setProperty('--accent', style.accentColor);
+    micBtn.style.background = style.accentColor;
+  }
+  if (style.textColor) document.body.style.color = style.textColor;
+  if (style.fontSize) document.body.style.fontSize = style.fontSize;
+  if (style.borderRadius) card.style.borderRadius = style.borderRadius;
+}
+
 function speak(text) {
   addBubble(text, 'assistant');
   const utter = new SpeechSynthesisUtterance(text);
@@ -290,7 +306,21 @@ function buildSystemPrompt() {
     weatherBlock = `Aktuelles Wetter in ${w.ort}: ${w.beschreibung}, ${w.temperatur}°C (gefühlt ${w.gefuehlt}°C), Luftfeuchtigkeit ${w.luftfeuchtigkeit}%, Wind ${w.wind} km/h. Tagesmaximum ${w.tagesmax}°C, Tagesminimum ${w.tagesmin}°C.`;
   }
 
-  return `Du bist ein hilfsbereiter Sprachassistent. Antworte immer auf Deutsch, kurz und natürlich gesprochen (1-3 Sätze), da die Antwort per Sprachausgabe vorgelesen wird. Vermeide Aufzählungen, Markdown oder Sonderzeichen.
+  return `Du bist ein hilfsbereiter Sprachassistent mit der Fähigkeit, das Aussehen deiner eigenen Web-Oberfläche zu verändern.
+
+Antworte IMMER ausschließlich mit einem einzigen validen JSON-Objekt, ohne Markdown, ohne Codeblöcke, ohne zusätzlichen Text davor oder danach. Format:
+
+{"speech": "Gesprochene Antwort, kurz und natürlich, 1-3 Sätze, keine Sonderzeichen", "style": { ... optional, nur bei Wunsch nach Aussehensänderung ... }}
+
+Das "style"-Feld ist optional und wird nur gesetzt, wenn der Nutzer explizit oder implizit eine Änderung des Aussehens wünscht (z.B. "mach den Hintergrund blau", "größere Schrift", "dunkleres Design"). Erlaubte style-Schlüssel (alle optional, nur setzen was gewünscht ist):
+- "background": CSS-Farbe oder Gradient für den Seitenhintergrund (z.B. "linear-gradient(135deg, #000, #333)" oder "#1a1a1a")
+- "cardBackground": CSS-Farbe/rgba für die Kartenfläche
+- "accentColor": Hex-Farbe für Mikrofon-Button und Akzente
+- "textColor": Hex-Farbe für den Text
+- "fontSize": CSS-Größe für den Basistext (z.B. "18px")
+- "borderRadius": CSS-Radius für die Karte (z.B. "8px" oder "40px")
+
+Nutze nur gültige CSS-Werte. Setze niemals das style-Feld, wenn keine Aussehensänderung gewünscht ist.
 
 Wetterdaten (nutze sie nur, wenn relevant für die Frage):
 ${weatherBlock}`;
@@ -314,10 +344,12 @@ async function askGroq(userText) {
         model: 'llama-3.3-70b-versatile',
         messages: [
           { role: 'system', content: buildSystemPrompt() },
+          ...conversationHistory,
           { role: 'user', content: userText }
         ],
         temperature: 0.7,
-        max_tokens: 300
+        max_tokens: 300,
+        response_format: { type: 'json_object' }
       })
     });
 
@@ -327,7 +359,31 @@ async function askGroq(userText) {
     }
 
     const data = await response.json();
-    const answer = data.choices[0].message.content.trim();
+    const rawAnswer = data.choices[0].message.content.trim();
+
+    let answer = rawAnswer;
+    let style = null;
+    try {
+      // Falls das Modell versehentlich Codeblock-Markierungen mitschickt, entfernen
+      const cleaned = rawAnswer.replace(/^```json\s*|^```\s*|```$/g, '').trim();
+      const parsed = JSON.parse(cleaned);
+      answer = parsed.speech || rawAnswer;
+      style = parsed.style || null;
+    } catch (parseErr) {
+      // Fallback: falls kein valides JSON, Rohtext als Antwort nutzen
+      console.warn('Antwort war kein valides JSON, nutze Rohtext.', parseErr);
+    }
+
+    if (style) applyStyle(style);
+
+    // Verlauf aktualisieren: aktuelle Frage + Antwort anhängen
+    conversationHistory.push({ role: 'user', content: userText });
+    conversationHistory.push({ role: 'assistant', content: answer });
+    // Auf die letzten 5 Nachrichten begrenzen (bei Bedarf älteste zuerst entfernen)
+    while (conversationHistory.length > 5) {
+      conversationHistory.shift();
+    }
+
     speak(answer);
   } catch (err) {
     console.error(err);
