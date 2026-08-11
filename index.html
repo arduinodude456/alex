@@ -135,6 +135,8 @@
       <input type="password" id="apiKey" placeholder="gsk_...">
       <label for="city">Stadt (für Wetter)</label>
       <input type="text" id="city" placeholder="Zwickau" value="Zwickau">
+      <label for="voiceSelect">Stimme</label>
+      <select id="voiceSelect" style="width:100%; padding:6px 8px; border-radius:6px; border:1px solid rgba(255,255,255,0.2); background:rgba(255,255,255,0.08); color:#fff; font-size:0.85rem;"></select>
     </div>
   </details>
 
@@ -171,6 +173,42 @@ const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecogni
 let recognition = null;
 let listening = false;
 let currentWeather = null;
+
+// Stimmenauswahl
+const voiceSelect = document.getElementById('voiceSelect');
+let availableVoices = [];
+
+function loadVoices() {
+  const allVoices = window.speechSynthesis.getVoices();
+  // Bevorzugt deutsche Stimmen, falls keine vorhanden sind alle anzeigen
+  const germanVoices = allVoices.filter(v => v.lang.startsWith('de'));
+  availableVoices = germanVoices.length > 0 ? germanVoices : allVoices;
+
+  if (availableVoices.length === 0) return;
+
+  voiceSelect.innerHTML = '';
+  availableVoices.forEach(v => {
+    const opt = document.createElement('option');
+    opt.value = v.name;
+    opt.textContent = v.name + (v.lang ? ` (${v.lang})` : '');
+    voiceSelect.appendChild(opt);
+  });
+
+  const savedVoice = localStorage.getItem('assistant_voice');
+  if (savedVoice && availableVoices.some(v => v.name === savedVoice)) {
+    voiceSelect.value = savedVoice;
+  }
+}
+
+voiceSelect.addEventListener('change', () => {
+  localStorage.setItem('assistant_voice', voiceSelect.value);
+});
+
+// Stimmen laden (bei manchen Browsern erst nach dem Event verfügbar)
+loadVoices();
+if (window.speechSynthesis.onvoiceschanged !== undefined) {
+  window.speechSynthesis.onvoiceschanged = loadVoices;
+}
 
 const weatherCodes = {
   0: 'klarer Himmel', 1: 'überwiegend klar', 2: 'teilweise bewölkt', 3: 'bedeckt',
@@ -237,6 +275,11 @@ function speak(text) {
   const utter = new SpeechSynthesisUtterance(text);
   utter.lang = 'de-DE';
   utter.rate = 1;
+
+  const selectedVoiceName = voiceSelect.value;
+  const voice = availableVoices.find(v => v.name === selectedVoiceName);
+  if (voice) utter.voice = voice;
+
   window.speechSynthesis.speak(utter);
 }
 
