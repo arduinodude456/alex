@@ -346,7 +346,7 @@ async function askGroq(userText) {
         'Authorization': `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
+        model: 'compound-mini',
         messages: [
           { role: 'system', content: buildSystemPrompt() },
           ...conversationHistory,
