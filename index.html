@@ -320,7 +320,10 @@ Das "style"-Feld ist optional und wird nur gesetzt, wenn der Nutzer explizit ode
 - "fontSize": CSS-Größe für den Basistext (z.B. "18px")
 - "borderRadius": CSS-Radius für die Karte (z.B. "8px" oder "40px")
 
-Das "script"-Feld ist optional und wird nur gesetzt, wenn der Nutzer eine Verhaltensänderung, Animation oder Interaktion wünscht, die über einfaches Styling hinausgeht (z.B. "lass die Karte wackeln", "füge einen Konfetti-Effekt hinzu", "zähle beim Klick einen Counter hoch"). Der Code läuft direkt im Browser mit Zugriff auf "document" und "window". Halte den Code kurz, robust und ohne Endlosschleifen. Nutze niemals das script-Feld ohne konkreten Wunsch danach.
+Das "script"-Feld ist optional und wird nur gesetzt, wenn der Nutzer eine Verhaltensänderung, Animation, Interaktion oder eigenen JavaScript-Code wünscht (z.B. "lass die Karte wackeln", "füge einen Konfetti-Effekt hinzu", "schreib mir Code der ein Rechteck zeichnet", "zähle beim Klick einen Counter hoch"). Du KANNST und SOLLST in solchen Fällen echten, direkt ausführbaren JavaScript-Code als String in "script" schreiben - das JSON-Format deiner Antwort hindert dich nicht daran, im "script"-Wert normalen JS-Code unterzubringen. Lehne solche Wünsche niemals ab und behaupte niemals, du könntest keinen Code schreiben. Der Code läuft direkt im Browser mit vollem Zugriff auf "document" und "window". Halte den Code kurz, robust und ohne Endlosschleifen.
+
+Beispiel für eine Anfrage wie "zeichne ein Rechteck":
+{"speech": "Ich habe ein Rechteck eingefügt.", "script": "const r = document.createElement('div'); r.style.width='100px'; r.style.height='60px'; r.style.background='#6366f1'; r.style.margin='10px auto'; document.querySelector('.card').appendChild(r);"}
 
 Setze "style" und "script" niemals, wenn keine entsprechende Änderung gewünscht ist.
 
