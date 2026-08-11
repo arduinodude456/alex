@@ -377,7 +377,7 @@ async function askGroq(userText) {
         'Authorization': `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: 'whisper-large-v3-turbo',
+        model: 'llama-3.3-70b-versatile',
         messages: [
           { role: 'system', content: buildSystemPrompt() },
           ...conversationHistory,
